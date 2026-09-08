@@ -1,41 +1,94 @@
-# Personal Skills
+# Personal Codex Setup
 
-Reusable agent skills maintained by Jianbo He.
+Rebuild Jianbo He's global instructions, skills, and enabled plugins on a fresh
+Linux or macOS Codex CLI environment.
 
-These personal skills complement the user's AGENTS rules. Shared policies such as
-publication authorization, PR language/style, and EMQX static-check gates belong
-in AGENTS and are not duplicated in each skill. Configure those rules before
-using this repository in another environment.
+## Install
 
-| Skill | Purpose |
-| --- | --- |
-| [emqx-pr-publication](skills/emqx-pr-publication/SKILL.md) | Prepare and publish EMQX-family pull requests. |
-| [emqx-hot-patch-package](skills/emqx-hot-patch-package/SKILL.md) | Package compiled EMQX beam hot patches with a customer README and checksums. |
+Prerequisites: Python 3.10+, Git, Node.js/npm (`npx`), and a logged-in Codex CLI
+with `codex plugin add` and `codex plugin list --json` support.
+This repository is private; the clone step also needs GitHub access.
 
-## Local installation
+With GitHub CLI already authenticated:
 
-Clone this repository and link the desired skill directories into your agent's
-skill discovery directory. For the shared `~/.agents/skills` layout:
+```sh
+gh repo clone hjianbo/skills && python3 skills/bootstrap.py --apply
+```
+
+Or clone over SSH and run:
 
 ```sh
 git clone git@github.com:hjianbo/skills.git
-cd skills
-mkdir -p "$HOME/.agents/skills"
-ln -s "$PWD/skills/emqx-pr-publication" "$HOME/.agents/skills/emqx-pr-publication"
-ln -s "$PWD/skills/emqx-hot-patch-package" "$HOME/.agents/skills/emqx-hot-patch-package"
+python3 skills/bootstrap.py --apply
 ```
 
-If a destination already exists, inspect and back it up before replacing it.
-Links expose local changes immediately. Use `git pull --ff-only` in the clone to update.
+Keep the checkout: installed instructions and first-party skills link to it.
+Without `--apply`, the script only prints its plan and does not run installers.
 
-The packaging helper requires Python 3. Erlang is optional for extracting beam
-MD5 metadata. Run it with `--help` for the supported arguments.
+## Managed content
 
-Run the packaging regression tests with `python3 -m unittest discover -s tests`.
+| Source | Installed content |
+| --- | --- |
+| [global/AGENTS.md](global/AGENTS.md) | Global personal instructions |
+| This repository | `emqx-pr-publication`, `emqx-hot-patch-package` |
+| `mattpocock/skills` | `grilling` only |
+| `vercel-labs/skills` | `find-skills` only |
+| `mvanhorn/last30days-skill` | `last30days` only |
+| Codex remote marketplace | Superpowers, Deep Research, Plugin Management, OpenAI Templates |
+
+[bootstrap.json](bootstrap.json) is the installation manifest. Third-party sources
+remain upstream-managed; the Skills CLI version is pinned. A fresh installation
+gets the versions available from those sources at installation time, not a
+byte-identical snapshot of this computer. Actual plugin versions and skill source
+hashes are recorded locally in `~/.agents/bootstrap-result.json`.
+
+The bootstrap does not migrate credentials, auth sessions, memories, project
+AGENTS, model/provider choices, MCP connections, permissions, or caches.
+Disabled Ponytail is not installed. Account-provided system skills remain managed
+by Codex. Remote plugins depend on availability to the destination account;
+unavailable plugins cause a clear failure rather than a false success.
+Research services may need their own credentials after installation.
+
+## Update and recovery
+
+```sh
+git pull --ff-only
+python3 bootstrap.py --apply
+```
+
+A normal rerun skips installed upstream skills with the expected source and
+enabled plugins. To refresh those managed dependencies too:
+
+```sh
+python3 bootstrap.py --apply --update
+```
+
+Before replacing files, the script backs them up under
+`~/.agents/backups/bootstrap-*/`. Each numbered backup folder contains an
+`original-path.txt` and the original file or directory. Existing Codex config and
+the Skills CLI lock are also backed up before invoking installers. Unrelated
+skills and settings are retained.
+
+If an installation fails, completed steps remain in place; correct the reported
+problem and rerun. Backups are not automatically deleted. To restore an older
+file, inspect its recorded destination, move the replacement aside, and restore
+the backup there. This is file recovery, not automatic rollback of remote plugin
+installations.
+
+`CODEX_HOME`, when set, selects the Codex configuration directory; shared skills
+remain in `~/.agents/skills`. Start a new Codex session after installation.
 
 ## Maintenance
 
-Edit these first-party skills here and commit verified changes. Keep third-party
-skills installed from their own upstream sources; this repository does not vendor
-them. Personal AGENTS rules, memories, credentials, and generated patch packages
-do not belong in this repository.
+Edit global instructions in `global/AGENTS.md`, personal skills in `skills/`,
+and sources in `bootstrap.json`. Do not commit secrets or generated packages.
+Shared policy belongs in AGENTS; skills contain only task-specific guidance.
+
+```sh
+python3 -m unittest discover -s tests
+python3 bootstrap.py
+```
+
+The bootstrap tests use temporary homes and simulated installer commands; they
+do not install plugins into your account. The packaging helper tests cover zip
+contents and overwrite protection, not runtime EMQX hot loading.

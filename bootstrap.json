@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "skills_cli_version": "1.5.24",
+  "local_skills": ["emqx-pr-publication", "emqx-hot-patch-package"],
+  "upstream_skills": [
+    {"name": "grilling", "source": "mattpocock/skills"},
+    {"name": "find-skills", "source": "vercel-labs/skills"},
+    {"name": "last30days", "source": "mvanhorn/last30days-skill"}
+  ],
+  "plugins": [
+    "superpowers@openai-curated-remote",
+    "deep-research-work@openai-curated-remote",
+    "plugin-management@openai-curated-remote",
+    "openai-templates@openai-curated-remote"
+  ]
+}
