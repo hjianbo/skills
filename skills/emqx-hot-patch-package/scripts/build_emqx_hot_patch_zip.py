@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
+import re
 import shutil
 import subprocess
 import sys
@@ -54,10 +54,6 @@ def rel(path: Path, root: Path) -> str:
 
 
 def render_readme(args: argparse.Namespace, copied_beams: list[Path], output_root: Path) -> str:
-    fixed_errors = args.fixed_errors or [
-        "protocol_violation",
-        "invalid_sql_statement_name",
-    ]
     modules = [module_name(p) for p in copied_beams]
     beam_lines: list[str] = []
     for beam in copied_beams:
@@ -68,7 +64,11 @@ def render_readme(args: argparse.Namespace, copied_beams: list[Path], output_roo
             beam_lines.append(f"beam md5: {md5}")
         beam_lines.append("")
     beam_block = "\n".join(beam_lines).strip()
-    error_lines = "\n".join(f"- `{err}`" for err in fixed_errors)
+    error_section = ""
+    if args.fixed_errors:
+        error_section = "Errors addressed by this patch:\n\n" + "\n".join(
+            f"- `{err}`" for err in args.fixed_errors
+        )
     rm_lines = "\n".join(
         f'   rm -f "$EMQX_DATA_DIR/patches/{module}.beam"' for module in modules
     )
@@ -84,7 +84,7 @@ def render_readme(args: argparse.Namespace, copied_beams: list[Path], output_roo
     )
 
     return textwrap.dedent(
-        f"""\
+        """\
         # {args.fix_title}
 
         This zip package contains a hot patch for EMQX.
@@ -93,9 +93,7 @@ def render_readme(args: argparse.Namespace, copied_beams: list[Path], output_roo
 
         {args.fix_summary}
 
-        Errors that may be addressed by this patch include:
-
-        {error_lines}
+        {error_section}
 
         ## Build Information
 
@@ -174,13 +172,13 @@ def render_readme(args: argparse.Namespace, copied_beams: list[Path], output_roo
            directory:
 
            ```bash
-{which_lines}
+        {which_lines}
            ```
 
            Expected result:
 
            ```erlang
-{expected_lines}
+        {expected_lines}
            ```
 
         6. If the node is restarted, verify `code:which/1` again.  If the
@@ -194,7 +192,7 @@ def render_readme(args: argparse.Namespace, copied_beams: list[Path], output_roo
            EMQX_HOME=/usr/lib/emqx
            EMQX_DATA_DIR=/var/lib/emqx
 
-{rm_lines}
+        {rm_lines}
            ```
 
         2. Reload modified modules:
@@ -206,26 +204,33 @@ def render_readme(args: argparse.Namespace, copied_beams: list[Path], output_roo
         3. Verify that the modules are no longer loaded from `data/patches`:
 
            ```bash
-{which_lines}
+        {which_lines}
            ```
 
            The path should point back to the normal EMQX release lib directory,
            for example:
 
            ```erlang
-{normal_lines}
+        {normal_lines}
            ```
 
         If hot rollback does not load the original modules as expected, remove
         the beam files from `data/patches` and restart the node.
         """
+    ).format(
+        args=args,
+        error_section=error_section,
+        beam_block=beam_block,
+        DOCS_URL=DOCS_URL,
+        which_lines=which_lines,
+        expected_lines=expected_lines,
+        rm_lines=rm_lines,
+        normal_lines=normal_lines,
     )
 
 
 def build_zip(package_dir: Path, zip_path: Path) -> None:
-    if zip_path.exists():
-        zip_path.unlink()
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(zip_path, "x", compression=zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(package_dir.rglob("*")):
             if path.name.startswith("."):
                 continue
@@ -250,18 +255,31 @@ def main() -> int:
     parser.add_argument("--app-version", default="unknown")
     args = parser.parse_args()
 
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.package_name):
+        parser.error("package name must start with a letter or digit and contain only "
+                     "letters, digits, '.', '_', '-'")
+    sources = [Path(beam).resolve() for beam in args.beam]
+    names: set[str] = set()
+    for src in sources:
+        if not src.is_file() or not re.fullmatch(r"[a-z][A-Za-z0-9_@]*\.beam", src.name):
+            parser.error(f"expected an existing beam file with an unquoted Erlang module name: {src}")
+        if src.name in names:
+            parser.error(f"duplicate beam filename: {src.name}")
+        names.add(src.name)
+
     output_dir = Path(args.output_dir).resolve()
     package_dir = output_dir / args.package_name
+    zip_path = output_dir / f"{args.package_name}.zip"
+    for target in (package_dir, zip_path):
+        if target.exists() or target.is_symlink():
+            parser.error(f"output already exists: {target}; choose another package name or output directory")
     patches_dir = package_dir / "patches"
-    if package_dir.exists():
-        shutil.rmtree(package_dir)
-    patches_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    package_dir.mkdir()
+    patches_dir.mkdir()
 
     copied_beams: list[Path] = []
-    for beam_arg in args.beam:
-        src = Path(beam_arg).resolve()
-        if not src.is_file():
-            raise SystemExit(f"beam file not found: {src}")
+    for src in sources:
         dst = patches_dir / src.name
         shutil.copy2(src, dst)
         copied_beams.append(dst)
@@ -269,7 +287,6 @@ def main() -> int:
     readme = render_readme(args, copied_beams, package_dir)
     (package_dir / "README.md").write_text(readme, encoding="utf-8")
 
-    zip_path = output_dir / f"{args.package_name}.zip"
     build_zip(package_dir, zip_path)
 
     print(f"package: {zip_path}")

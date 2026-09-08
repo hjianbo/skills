@@ -21,11 +21,12 @@ ln -s "$PWD/skills/emqx-hot-patch-package" "$HOME/.agents/skills/emqx-hot-patch-
 ```
 
 If a destination already exists, inspect and back it up before replacing it.
-Links expose local changes
-immediately; use `git pull --ff-only` in the clone to update from this repository.
+Links expose local changes immediately. Use `git pull --ff-only` in the clone to update.
 
 The packaging helper requires Python 3. Erlang is optional for extracting beam
 MD5 metadata. Run it with `--help` for the supported arguments.
+
+Run the packaging regression tests with `python3 -m unittest discover -s tests`.
 
 ## Maintenance
 

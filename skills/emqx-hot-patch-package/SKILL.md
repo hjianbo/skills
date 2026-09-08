@@ -1,72 +1,30 @@
 ---
 name: emqx-hot-patch-package
-description: Build EMQX hot patch zip packages from compiled .beam files, including a customer-facing README with the fixed issue, source version/PR metadata, official EMQX data directory guidance, c:lm() load steps, rollback steps, and checksums. Use when Codex needs to package one or more EMQX beam hot patches for customer delivery.
+description: Package compiled EMQX beam hot patches as customer-deliverable zip files with provenance, load/rollback instructions, and checksums.
 ---
 
 # EMQX Hot Patch Package
 
-Create customer-deliverable EMQX hot patch zip files from already compiled
-`.beam` files.
+## Prepare
 
-## Workflow
+- Verify the target release, source and patch commits, fix PR, build profile,
+  OTP version, application version, and beam paths. Report missing provenance.
+- Use beams from the matching release profile, not test/check builds. Reuse verified
+  compiled artifacts; otherwise compile with the target checkout's build command.
+- Resolve `scripts/build_emqx_hot_patch_zip.py` relative to this skill directory.
+  Run it with `--help` for arguments. Supply the verified build metadata and a
+  concrete fix summary; pass `--fixed-errors` only for errors this patch addresses.
 
-1. Confirm the target branch/release and current commit.
-   - Prefer exact commits over vague release names.
-   - Record the base commit, fix PR URL, patch commit, build profile, OTP version,
-     app version if known, and the compiled beam path.
+## Package and verify
 
-2. Compile the target profile before packaging.
-   - For EMQX release-510 enterprise builds, `make emqx-enterprise-compile` is
-     the expected compile target.
-   - Use the release profile beam, not `test` or `check` profile beams.  For
-     example:
-     `_build/emqx-enterprise/lib/emqx_postgresql/ebin/emqx_postgresql.beam`.
-
-3. Generate the package with `scripts/build_emqx_hot_patch_zip.py`.
-   - Package format must be `.zip`, not `.beams`.
-   - Package layout must be:
-     ```text
-     <package-name>/
-     <package-name>/README.md
-     <package-name>/patches/<module>.beam
-     ```
-   - The README must cite the official EMQX files/directories documentation:
-     `https://docs.emqx.com/en/emqx/latest/deploy/install.html#files-and-directories`
-   - Load and rollback steps should use `emqx eval 'c:lm().'`; do not use
-     `load_abs` unless the user explicitly asks for that style.
-
-4. Verify the package.
-   - Run `unzip -l <package>.zip`.
-   - Check `sha256sum <package>.zip` and the beam files.
-   - Ensure the README no longer mentions obsolete package formats or commands.
-
-## Script Usage
-
-Example:
-
-```bash
-python3 ~/.agents/skills/emqx-hot-patch-package/scripts/build_emqx_hot_patch_zip.py \
-  --package-name emqx-postgresql-r510-pr17627 \
-  --output-dir . \
-  --beam _build/emqx-enterprise/lib/emqx_postgresql/ebin/emqx_postgresql.beam \
-  --fix-title "EMQX PostgreSQL Connector Hot Patch" \
-  --fix-summary "Fixes PostgreSQL connector raw batch execution when prepared statements are disabled." \
-  --fixed-errors "08P01 protocol_violation" \
-  --fixed-errors "26000 invalid_sql_statement_name" \
-  --source-branch ce/release-510 \
-  --base-commit "$(git rev-parse ce/release-510)" \
-  --fix-pr-url https://github.com/emqx/emqx/pull/17627 \
-  --patch-commit "$(git rev-parse HEAD)" \
-  --git-describe "$(git describe --tags --always --dirty)" \
-  --build-profile emqx-enterprise \
-  --otp-version "$(erl -noshell -eval 'io:format(\"~s\", [erlang:system_info(otp_release)]), halt().')" \
-  --app-version "emqx_postgresql 0.2.11"
-```
-
-The script writes:
-
-- `<package-name>/README.md`
-- `<package-name>/patches/*.beam`
-- `<package-name>.zip`
-
-It also prints checksums and the zip listing.
+- Choose an unused package name and output directory. The helper refuses to replace
+  existing packages. It produces `<name>.zip` containing `<name>/README.md` and
+  `<name>/patches/*.beam`, and prints SHA256 checksums.
+- Inspect the archive listing, compare packaged beams with the input checksums,
+  and review the generated README for the exact target before delivery.
+- Keep the official EMQX files/directories documentation link in the README and
+  verify deployment paths against the target release. Load with `emqx eval 'c:lm().'`
+  and verify `code:which/1`; document rollback and its restart fallback.
+- Check for existing customer patches before applying replacement instructions;
+  rollback must restore any previous patch. Packaging does not authorize deployment.
+- Report the zip path, checksum, target build, and any unverified runtime steps.
