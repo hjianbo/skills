@@ -1,0 +1,4 @@
+interface:
+  display_name: "EMQX Hot Patch Package"
+  short_description: "Build EMQX beam hot patch zip packages"
+  default_prompt: "Use $emqx-hot-patch-package to build an EMQX beam hot patch zip with README and checksums."
