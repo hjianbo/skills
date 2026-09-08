@@ -2,6 +2,11 @@
 
 Reusable agent skills maintained by Jianbo He.
 
+These personal skills complement the user's AGENTS rules. Shared policies such as
+publication authorization, PR language/style, and EMQX static-check gates belong
+in AGENTS and are not duplicated in each skill. Configure those rules before
+using this repository in another environment.
+
 | Skill | Purpose |
 | --- | --- |
 | [emqx-pr-publication](skills/emqx-pr-publication/SKILL.md) | Prepare and publish EMQX-family pull requests. |

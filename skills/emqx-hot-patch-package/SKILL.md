@@ -1,30 +1,20 @@
 ---
 name: emqx-hot-patch-package
-description: Package compiled EMQX beam hot patches as customer-deliverable zip files with provenance, load/rollback instructions, and checksums.
+description: Use when packaging compiled EMQX beam hot patches for customer delivery.
 ---
 
 # EMQX Hot Patch Package
 
-## Prepare
-
-- Verify the target release, source and patch commits, fix PR, build profile,
-  OTP version, application version, and beam paths. Report missing provenance.
-- Use beams from the matching release profile, not test/check builds. Reuse verified
-  compiled artifacts; otherwise compile with the target checkout's build command.
-- Resolve `scripts/build_emqx_hot_patch_zip.py` relative to this skill directory.
-  Run it with `--help` for arguments. Supply the verified build metadata and a
-  concrete fix summary; pass `--fixed-errors` only for errors this patch addresses.
-
-## Package and verify
-
-- Choose an unused package name and output directory. The helper refuses to replace
-  existing packages. It produces `<name>.zip` containing `<name>/README.md` and
-  `<name>/patches/*.beam`, and prints SHA256 checksums.
-- Inspect the archive listing, compare packaged beams with the input checksums,
-  and review the generated README for the exact target before delivery.
-- Keep the official EMQX files/directories documentation link in the README and
-  verify deployment paths against the target release. Load with `emqx eval 'c:lm().'`
-  and verify `code:which/1`; document rollback and its restart fallback.
-- Check for existing customer patches before applying replacement instructions;
-  rollback must restore any previous patch. Packaging does not authorize deployment.
-- Report the zip path, checksum, target build, and any unverified runtime steps.
+1. Verify target release, source/patch commits, fix PR, build profile, OTP/app
+   versions, and beam paths; report missing provenance. Reuse verified release
+   beams or compile the target profile, never test/check artifacts.
+2. Run `scripts/build_emqx_hot_patch_zip.py` relative to this skill directory;
+   use `--help` for arguments. Supply build metadata, a concrete fix summary,
+   and only applicable `--fixed-errors`. Choose unused output paths.
+3. Inspect the zip layout (`<name>/README.md`, `<name>/patches/*.beam`), compare
+   packaged/input SHA256 values, and review the README for the target deployment.
+4. Retain the official directory documentation link, `emqx eval 'c:lm().'`,
+   `code:which/1` verification, and rollback/restart fallback. Replacement
+   instructions must preserve prior customer patches for rollback.
+5. Deliver the zip path, SHA256, target build, and unverified runtime steps.
+   Packaging does not authorize deployment.
